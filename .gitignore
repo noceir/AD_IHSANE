@@ -1,0 +1,16 @@
+# Windows System Files
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Sensitive Data / Credentials
+*.pfx
+*.pem
+*.key
+*clear_passwords.txt
+
+# Temp & Editor files
+.vs/
+.idea/
+*.tmp
+*.log
