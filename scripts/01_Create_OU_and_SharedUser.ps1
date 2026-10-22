@@ -1,18 +1,18 @@
 <#
 .SYNOPSIS
-    Creates Organizational Unit SI110 and the shared student account 'eleve'.
+    Creates Organizational Unit SILYCEE and the shared student account 'eleve'.
 .DESCRIPTION
     Script for Active Directory Domain Controller (LEI.IDEMY).
-    Creates OU=SI110 and a shared user account 'eleve' configured with no password,
+    Creates OU=SILYCEE and a shared user account 'eleve' configured with no password,
     password never expires, and user cannot change password.
 .NOTES
     Domain: LEI.IDEMY
-    Target OU: OU=SI110,OU=CAMPUS IBN BADIS,DC=LEI,DC=IDEMY
+    Target OU: OU=SILYCEE,OU=CAMPUS IBN BADIS,DC=LEI,DC=IDEMY
 #>
 
 param (
     [string]$DomainName = "LEI.IDEMY",
-    [string]$OUName = "SI110",
+    [string]$OUName = "SILYCEE",
     [string]$ParentOU = "OU=CAMPUS IBN BADIS,DC=LEI,DC=IDEMY",
     [string]$UserName = "eleve"
 )

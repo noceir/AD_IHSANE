@@ -1,6 +1,6 @@
-# 🗺️ Technical Architecture Diagram & Flow Guide
+# 🗺️ Technical Architecture Diagram & Flow Guide — Salle SILYCEE
 
-## Multi-Class High-Volume Design (300+ Students / 11 Classes)
+## Multi-Class High-Volume Design (29 Laptops / Wi-Fi: `inf lycee`)
 
 ```
 +-----------------------------------------------------------------------+
@@ -8,17 +8,17 @@
 |                               (LEI.IDEMY)                             |
 |                                                                       |
 |  OU: CAMPUS IBN BADIS                                                 |
-|    └── OU: SI110                                                      |
-|         ├── GPO: GPO_SI110_Security                                   |
+|    └── OU: SILYCEE                                                    |
+|         ├── GPO: GPO_SILYCEE_Security                                 |
 |         ├── Shared User: eleve (No Password)                          |
-|         └── Computers: SI110-PC01 ... SI110-PC27                      |
+|         └── Computers: SILYCEE-PC01 ... SILYCEE-PC29                  |
 +-----------------------------------------------------------------------+
                                    |
                                    v
 +-----------------------------------------------------------------------+
 |                      LAPTOP CLIENT INSTANTIATION                       |
 |                                                                       |
-|  1. Laptop powers on -> Auto-connects to IHSANE_SCHOOL_WIFI           |
+|  1. Laptop powers on -> Auto-connects ONLY to Wi-Fi 'inf lycee'       |
 |  2. Windows logon -> Auto-logon as 'eleve' in 5 seconds               |
 |  3. Student opens Chrome -> Signs into @lesecolesihsane.com           |
 |  4. All assignments/code saved in personal Google Drive               |
