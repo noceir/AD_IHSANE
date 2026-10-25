@@ -1,8 +1,8 @@
-# 🧠 Full Project Context & AI Handover Document (V2) — Salle SILYCEE
-### Les Écoles Ihsane — Active Directory & Lab Automation Project (Updated)
+# 🧠 Full Project Context & AI Handover Document — Salle SILYCEE
+### Les Écoles Ihsane — Active Directory & Lab Automation Project
 
-> **Note for the Next AI Assistant (Gemini / Antigravity / Claude):**
-> Read this document first to get 100% of the technical context, domain parameters, GPO state, newly deployed scripts, security lockdowns, and exact next steps for this project.
+> **Note for the Next AI Assistant (Gemini / Antigravity):**
+> Read this document first to get 100% of the technical context, domain parameters, GPO XML state, exact scripts used, troubleshooting history, and current deployment status for this project.
 
 ---
 
@@ -12,121 +12,132 @@
 | :--- | :--- |
 | **Organization** | Les Écoles Ihsane (`@lesecolesihsane.com` for student Google Workspace) |
 | **Active Directory DNS Domain** | `LEI.IDEMY` |
-| **Active Directory NetBIOS Name** | `IDEMY` (Domain Admin login: `IDEMY\Administrateur`) |
+| **Active Directory NetBIOS Name** | `IDEMY` (Important: Domain Admin login is `IDEMY\Administrateur`) |
 | **Domain Controller IP (DNS)** | `10.12.43.253` |
 | **Server OS Language** | French (`C:\Users\Administrateur`, `IDEMY\Admins du domaine`) |
-| **Target Computer Lab** | **Salle SILYCEE** (29 Laptops: `SILYCEE-PC1` to `SILYCEE-PC29`) |
+| **Target Computer Lab** | **Salle SILYCEE** (29 Windows 10/11 Laptops: `SILYCEE-PC1` to `SILYCEE-PC29`) |
 | **Target Organizational Unit (OU)** | `OU=SILYCEE,OU=CAMPUS IBN BADIS,DC=LEI,DC=IDEMY` |
-| **Shared Student AD Account** | Username: `eleve` (`IDEMY\eleve`) — **Blank Password + Registry AutoAdminLogon** |
+| **Legacy Test OU** | `OU=SI110,OU=CAMPUS IBN BADIS,DC=LEI,DC=IDEMY` (Used during initial testing) |
+| **Shared Student AD Account** | Username: `eleve` (`IDEMY\eleve` or `eleve@LEI.IDEMY`) — **Blank / Empty Password** |
 | **Exclusive Lab Wi-Fi** | SSID: **`INF`** (Locked via `netsh wlan add filter` so laptops ONLY see/connect to `INF`) |
-| **Approved Desktop Tools** | **PyCharm, Arduino IDE, Java, VS Code, Thonny, Python, Chrome, Edge, GLPI** |
+| **Permanent Lab Software** | **Python, Arduino IDE, Java, VS Code, Thonny** (Shortcuts copied to `C:\Users\Public\Desktop`) |
 
 ---
 
-## 2. Updated Project State & Completed Deployments
+## 2. Core Project Requirements (From Management)
 
-All 29 laptops were joined to the domain **without formatting**. To resolve issues with legacy games (GTA San Andreas), unmanaged internet access, and security leaks, the following configurations were executed on the Domain Controller (`10.12.43.253`):
+1. **Remote Software Installation**: Ability to push software from the Domain Controller to all 29 laptops remotely (via WinRM PowerShell Remoting or GPO) without touching each laptop.
+2. **Strict Student Lockdowns**:
+   - Students log in with a single shared account (`eleve` with no password) and save their personal schoolwork to Google Drive (`@lesecolesihsane.com`) in Chrome.
+   - Standard user cannot install software (`Turn off Windows Installer` enabled for non-managed apps) or open Control Panel / PC Settings.
+   - Laptops can ONLY connect to the **`INF`** Wi-Fi network; all other Wi-Fi networks (including student phone hotspots) are blocked and hidden.
+3. **Ephemeral Sessions (Wipe on Lid Close / Reboot)**:
+   - Closing the laptop lid (both **On Battery** and **Plugged In**) triggers an immediate **Shut down**.
+   - On every startup, a GPO Startup Script (`wipe.bat`) wipes `C:\Users\eleve\Desktop`, `Downloads`, `Documents`, and `Temp`, while keeping the permanent programming tools (**Python, Arduino IDE, Java, VS Code, Thonny**) intact in `C:\Users\Public\Desktop` and `C:\Program Files`.
 
-### A. Group Policy Object: `GPO_SILYCEE_Security`
+---
+
+## 3. What Has Already Been Completed on the Server (`LEI.IDEMY`)
+
+### A. Domain Password Policy & Shared User (`eleve`)
+Executed on the Domain Controller:
+```powershell
+# 1. Disabled complexity and minimum password length to allow blank passwords
+Set-ADDefaultDomainPasswordPolicy -Identity "LEI.IDEMY" -ComplexityEnabled $false -MinPasswordLength 0 -MinPasswordAge (New-TimeSpan -Days 0) -PasswordHistoryCount 0
+
+# 2. Created OU=SILYCEE under OU=CAMPUS IBN BADIS
+New-ADOrganizationalUnit -Name "SILYCEE" -Path "OU=CAMPUS IBN BADIS,DC=LEI,DC=IDEMY"
+
+# 3. Created/Moved shared user 'eleve' with Blank Password into OU=SILYCEE
+Set-ADUser -Identity "eleve" -PasswordNotRequired $true
+Get-ADUser -Identity "eleve" | Move-ADObject -TargetPath "OU=SILYCEE,OU=CAMPUS IBN BADIS,DC=LEI,DC=IDEMY"
+```
+
+### B. Group Policy Object: `GPO_SILYCEE_Security`
 - **GUID**: `{090E703B-7094-45FD-8EB2-414F500290CD}`
 - **Linked To**: `OU=SILYCEE,OU=CAMPUS IBN BADIS,DC=LEI,DC=IDEMY`
-
-#### 1. Web Browsing Lock (Edge & Google Chrome)
-- **Blocked**: Everything (`URLBlocklist = *`).
-- **Google Search**: **100% BLOCKED** (`google.com` and `www.google.com` are omitted).
-- **Incognito/InPrivate**: `InPrivateModeAvailability = 1` (Disabled).
-- **URL Whitelist (`URLAllowlist`) Active Entries**:
-  - `https://drive.google.com` & `https://[*.]drive.google.com`
-  - `https://docs.google.com` & `https://[*.]docs.google.com`
-  - `https://classroom.google.com` & `https://[*.]classroom.google.com`
-  - `https://mail.google.com`
-  - `https://accounts.google.com`
-  - `https://ssl.gstatic.com` & `https://[*.]gstatic.com`
-  - `https://apis.google.com`
-  - `https://[*.]googleusercontent.com`
-  - `https://tinkercad.com` & `https://[*.]tinkercad.com` (Arduino 3D / circuits)
-  - `https://[*.]autodesk.com` & `https://[*.]autodesk360.com`
-  - `https://[*.]arduino.cc`
-  - `https://[*.]lesecolesihsane.com`
-  - `https://jupyter.org` & `https://[*.]jupyter.org`
-
-#### 2. Tamper Prevention & Anti-Theft
-- **Command Prompt (`DisableCMD = 2`)**:
-  - Prevents students from opening `cmd.exe`.
-  - **Stops students from running `netsh wlan show profile ... key=clear` to steal the `INF` Wi-Fi password**.
-  - Value `2` ensures system background batch scripts continue to run silently.
-- **Network / DNS Lockdown (`NC_LanProperties = 0`, `NC_EnableAdminProhibits = 1`)**:
-  - Students cannot open IPv4 properties to alter DNS servers.
-- **Control Panel & PC Settings**: Prohibited for standard user `eleve`.
-- **Wallpaper Lockdown (`NoChangingWallPaper = 1`)**:
-  - Keeps standard Windows wallpaper; blocks students from setting custom wallpapers.
-
-#### 3. USB & Application Execution Policy
-- **USB Installers**: Prompts for Administrator credentials via UAC (Standard students without password cannot install; Admin can install by typing password).
-- **IDE Compilers Preserved**: `RestrictRun` was **not** applied, ensuring Arduino background tools (`avrdude.exe`, `arduino-cli.exe`) and PyCharm helpers run without errors.
-- **Power Management**: Closing laptop lid (On Battery & Plugged In) triggers immediate **Shut down**.
+- **Configured Policies**:
+  1. **Computer > System Services > WinRM**: Startup Mode = `Automatic`
+  2. **Computer > Admin Templates > WinRM Service > Allow remote server management through WinRM**: `Enabled` (IPv4 filter: `*`, IPv6 filter: `*`)
+  3. **Computer > Registry Firewall Rule**: Inbound TCP Port `5985` allowed for WinRM
+  4. **Computer > Admin Templates > Power Management > Button Settings**:
+     - `Select the lid switch action (on battery)` = `Enabled` ➔ `Shut down`
+     - `Select the lid switch action (plugged in)` = `Enabled` ➔ `Shut down`
+  5. **Computer > Admin Templates > System > User Profiles**:
+     - `Delete user profiles older than a specified number of days on system restart` = `Enabled` (`1` day)
+  6. **Computer > Admin Templates > Windows Components > Windows Installer**:
+     - `Turn off Windows Installer` = `Enabled` (`For non-managed applications only`)
+  7. **Computer > Windows Settings > Scripts (Startup)**:
+     - `wipe.bat` located in `\\LEI.IDEMY\SYSVOL\LEI.IDEMY\Policies\{090E703B-7094-45FD-8EB2-414F500290CD}\Machine\Scripts\Startup\wipe.bat`:
+       ```cmd
+       rd /s /q "C:\Users\eleve\Desktop" & mkdir "C:\Users\eleve\Desktop"
+       rd /s /q "C:\Users\eleve\Downloads" & mkdir "C:\Users\eleve\Downloads"
+       rd /s /q "C:\Users\eleve\Documents" & mkdir "C:\Users\eleve\Documents"
+       del /f /s /q "C:\Users\eleve\AppData\Local\Temp\*"
+       ```
+  8. **User > Admin Templates > Control Panel**:
+     - `Prohibit access to Control Panel and PC settings` = `Enabled`
 
 ---
 
-### B. Autonomous Self-Cleaning Startup Script (SYSVOL)
-Located at:
-`\\LEI.IDEMY\SYSVOL\LEI.IDEMY\Policies\{090E703B-7094-45FD-8EB2-414F500290CD}\Machine\Scripts\Startup\`
+## 4. What Has Been Executed on the Client Laptops (`SILYCEE-PC1` to `SILYCEE-PC29`)
 
-Consists of:
-1. **`wipe.bat`**: Calls `clean.ps1` with `-ExecutionPolicy Bypass`.
-2. **`clean.ps1`**: Executes silently on boot with `SYSTEM` privileges:
-   - **Purges Legacy Junk**: Deletes `C:\Games` and recursively removes any `*gta*` folders left over from the unformatted Windows state.
-   - **Cleans Public Desktop**: Deletes all shortcut `.lnk` files unless they match:
-     `PyCharm`, `Arduino`, `Code`, `Thonny`, `Python`, `Chrome`, `Edge`, `GLPI`.
-   - **Wipes Student Folders**: Purges `C:\Users\eleve\Desktop`, `Downloads`, `Documents`, and `AppData\Local\Temp`.
+### Master Client Provisioning Script (Run in Admin PowerShell on Each Laptop)
+Once a laptop is connected to Wi-Fi **`INF`**, this script:
+1. Locks Wi-Fi exclusively to `INF` and hides all other networks.
+2. Copies all Desktop shortcuts (**Python, Arduino, Java, VS Code, Thonny**) from the local user to `C:\Users\Public\Desktop\`.
+3. Sets IPv4 DNS to `10.12.43.253`.
+4. Configures Windows Registry (`Winlogon`) to auto-login as `IDEMY\eleve` (blank password) on boot.
+5. Joins the domain `LEI.IDEMY` directly into `OU=SILYCEE,OU=CAMPUS IBN BADIS,DC=LEI,DC=IDEMY` and reboots.
 
----
-
-## 3. Key Server Utility Scripts
-
-### Script 1: Master Setup Runner (`C:\Setup.ps1`)
-Contains the full idempotent PowerShell script to re-inject and configure all GPO registry keys, fast-boot configuration, and SYSVOL startup files on the Domain Controller.
-
-### Script 2: Live Health & Verification Dashboard (`C:\Verify_Lab.ps1`)
-Run this on the server when the lab laptops are turned on:
 ```powershell
-Import-Module ActiveDirectory
-
-$OU = "OU=SILYCEE,OU=CAMPUS IBN BADIS,DC=LEI,DC=IDEMY"
-$Computers = (Get-ADComputer -Filter * -SearchBase $OU | Sort-Object Name).Name
-
-Write-Host ">>> SALLE SILYCEE - LIVE GPO & HEALTH CHECK <<<" -ForegroundColor Cyan
-
-foreach ($PC in $Computers) {
-    if (Test-Connection -ComputerName $PC -Count 1 -Quiet) {
-        $Check = Invoke-Command -ComputerName $PC -ScriptBlock {
-            $edgeBlock = Test-Path "HKLM:\Software\Policies\Microsoft\Edge\URLBlocklist"
-            $cmdBlock  = Test-Path "HKCU:\Software\Policies\Microsoft\Windows\System"
-            return ($edgeBlock -and $cmdBlock)
-        } -ErrorAction SilentlyContinue
-
-        if ($Check) {
-            Write-Host "  [ONLINE]  $PC --> GPO Status: [✓] FULLY ACTIVE & PROTECTED" -ForegroundColor Green
-        } else {
-            Write-Host "  [ONLINE]  $PC --> GPO Status: [!] PULLING UPDATE NOW..." -ForegroundColor Yellow
-            Invoke-GPUpdate -Computer $PC -Force -RandomDelayInMinutes 0 -ErrorAction SilentlyContinue
-        }
-    } else {
-        Write-Host "  [OFFLINE] $PC" -ForegroundColor Red
-    }
-}
+netsh wlan add filter permission=allow ssid="INF" networktype=infrastructure
+netsh wlan add filter permission=denyall networktype=infrastructure
+netsh wlan set blockednetworks display=hide
+Copy-Item "$env:USERPROFILE\Desktop\*" "C:\Users\Public\Desktop\" -Recurse -Force -ErrorAction SilentlyContinue
+Get-DnsClientServerAddress | Where-Object {$_.AddressFamily -eq 2} | ForEach-Object { Set-DnsClientServerAddress -InterfaceIndex $_.InterfaceIndex -ServerAddresses "10.12.43.253" -ErrorAction SilentlyContinue }
+$reg = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
+Set-ItemProperty -Path $reg -Name "AutoAdminLogon" -Value "1" -Type String
+Set-ItemProperty -Path $reg -Name "DefaultDomainName" -Value "IDEMY" -Type String
+Set-ItemProperty -Path $reg -Name "DefaultUserName" -Value "eleve" -Type String
+Set-ItemProperty -Path $reg -Name "DefaultPassword" -Value "" -Type String
+$pass = ConvertTo-SecureString "<SERVER_ADMIN_PASSWORD>" -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential("IDEMY\Administrateur", $pass)
+$n = Read-Host "Enter PC Number (01 to 29)"
+Add-Computer -NewName "SILYCEE-PC$n" -DomainName "LEI.IDEMY" -OUPath "OU=SILYCEE,OU=CAMPUS IBN BADIS,DC=LEI,DC=IDEMY" -Credential $cred -Restart -Force
 ```
 
 ---
 
-## 4. Immediate Next Steps / Roadmap
+## 5. Known Issues Encountered & How We Solved Them
 
-1. **Physical Validation (Monday Morning)**:
-   - Boot `SILYCEE-PC1`.
-   - Verify: Clean desktop (only IDEs & browsers), Google Drive and Tinkercad load, Google Search blocked, CMD disabled, lid-close initiates shutdown.
-2. **Full Lab Verification**:
-   - Power on all 29 laptops and execute `C:\Verify_Lab.ps1` from `10.12.43.253`.
-3. **GLPI Agent Deployment**:
-   - Push `GLPI-Agent-x64.msi` silently across `OU=SILYCEE` via WinRM.
-4. **Git Sync**:
-   - Commit `PROJECT_CONTEXT_FOR_AI_V2.md`, `Setup.ps1`, and `Verify_Lab.ps1` to `https://github.com/noceir/AD_IHSANE`.
+1. **Domain Admin Credential Format**:
+   - Because the NetBIOS domain name is `IDEMY` while the DNS root is `LEI.IDEMY`, credentials must use **`IDEMY\Administrateur`** or **`Administrateur@LEI.IDEMY`**.
+2. **Laptops Stuck on Old Deleted Domain (`LEI.ACADEMY`)**:
+   - Some laptops (starting around PC #7) were previously joined to an old nonexistent domain called `LEI.ACADEMY`.
+   - Running `Add-Computer` directly on those machines throws `FailToUnjoinDomain` because Windows tries to contact `LEI.ACADEMY` to unjoin first.
+   - **Fix**: Switch the laptop to `WORKGROUP` first (`Remove-Computer -WorkgroupName "WORKGROUP" -Force -Restart` or via `sysdm.cpl` ➔ Workgroup `WORKGROUP`), reboot, and then run the join script.
+3. **Per-User Installed Apps (VS Code / Thonny)**:
+   - If VS Code or Thonny were installed in the local user's `C:\Users\pc\AppData\Local\Programs`, `eleve` cannot launch the shortcut unless the folder is copied to `C:\Program Files` or installed with `--scope machine`.
+
+---
+
+## 6. Useful Commands for Next Steps
+
+### Check All Joined Laptops in `OU=SILYCEE` (Run on Server)
+```powershell
+Get-ADComputer -Filter * -SearchBase "OU=SILYCEE,OU=CAMPUS IBN BADIS,DC=LEI,DC=IDEMY" | Select-Object Name, DNSHostName
+```
+
+### Force Instant GPO Update on All Joined Laptops Remotely (Run on Server)
+```powershell
+Get-ADComputer -Filter * -SearchBase "OU=SILYCEE,OU=CAMPUS IBN BADIS,DC=LEI,DC=IDEMY" | ForEach-Object { Invoke-GPUpdate -Computer $_.Name -Force -RandomDelayInMinutes 0 }
+```
+
+### Push Software Remotely to All Laptops in `OU=SILYCEE` (Run on Server)
+```powershell
+$PCs = (Get-ADComputer -Filter * -SearchBase "OU=SILYCEE,OU=CAMPUS IBN BADIS,DC=LEI,DC=IDEMY").Name
+Invoke-Command -ComputerName $PCs -ScriptBlock {
+    Start-Process msiexec.exe -ArgumentList '/i "\\LEI-DC\SoftwareShare\app.msi" /qn /norestart' -Wait
+}
+```
