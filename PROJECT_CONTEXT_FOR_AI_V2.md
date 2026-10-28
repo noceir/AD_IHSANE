@@ -2,7 +2,7 @@
 ### Les Écoles Ihsane — Active Directory & Lab Automation Project (Updated)
 
 > **Note for the Next AI Assistant (Gemini / Antigravity / Claude):**
-> Read this document first to get 100% of the technical context, domain parameters, GPO state, newly deployed scripts, security lockdowns, and exact next steps for this project.
+> Read this document first to get 100% of the technical context, domain parameters, GPO state, newly deployed scripts, security lockdowns, troubleshooting solutions, and exact next steps for this project.
 
 ---
 
@@ -82,51 +82,44 @@ Consists of:
 
 ---
 
-## 3. Key Server Utility Scripts
+## 3. Solved Traps & Troubleshooting Guide
 
-### Script 1: Master Setup Runner (`C:\Setup.ps1`)
-Contains the full idempotent PowerShell script to re-inject and configure all GPO registry keys, fast-boot configuration, and SYSVOL startup files on the Domain Controller.
+### 1. Python Blocked Even With Administrator Password
+- **Cause**: The GPO had `Turn off Windows Installer` (`DisableMSI = 1` or `2`) enabled. Python's executable unpacks embedded `.msi` files, which Windows Installer blocked with *"The system administrator has set policies to prevent this installation"*.
+- **Fix**: Executed `10_Unlock_Windows_Installer.ps1` (`DisableMSI = 0`) so administrators can install software.
 
-### Script 2: Live Health & Verification Dashboard (`C:\Verify_Lab.ps1`)
-Run this on the server when the lab laptops are turned on:
-```powershell
-Import-Module ActiveDirectory
-
-$OU = "OU=SILYCEE,OU=CAMPUS IBN BADIS,DC=LEI,DC=IDEMY"
-$Computers = (Get-ADComputer -Filter * -SearchBase $OU | Sort-Object Name).Name
-
-Write-Host ">>> SALLE SILYCEE - LIVE GPO & HEALTH CHECK <<<" -ForegroundColor Cyan
-
-foreach ($PC in $Computers) {
-    if (Test-Connection -ComputerName $PC -Count 1 -Quiet) {
-        $Check = Invoke-Command -ComputerName $PC -ScriptBlock {
-            $edgeBlock = Test-Path "HKLM:\Software\Policies\Microsoft\Edge\URLBlocklist"
-            $cmdBlock  = Test-Path "HKCU:\Software\Policies\Microsoft\Windows\System"
-            return ($edgeBlock -and $cmdBlock)
-        } -ErrorAction SilentlyContinue
-
-        if ($Check) {
-            Write-Host "  [ONLINE]  $PC --> GPO Status: [✓] FULLY ACTIVE & PROTECTED" -ForegroundColor Green
-        } else {
-            Write-Host "  [ONLINE]  $PC --> GPO Status: [!] PULLING UPDATE NOW..." -ForegroundColor Yellow
-            Invoke-GPUpdate -Computer $PC -Force -RandomDelayInMinutes 0 -ErrorAction SilentlyContinue
-        }
-    } else {
-        Write-Host "  [OFFLINE] $PC" -ForegroundColor Red
-    }
-}
-```
+### 2. Python / VS Code Broken for `IDEMY\eleve` (Access Denied)
+- **Cause**: Apps were installed in the old local user's `C:\Users\<old>\AppData\Local\Programs\`. When domain user `eleve` logs in, Windows restricts cross-user AppData access.
+- **Fix**: 
+  1. `Join_Domain_Client_V2.ps1` automatically grants read/execute permissions to `Domain Users` via `icacls` and registers Python in the System `PATH`.
+  2. For new Python installs, always use `InstallAllUsers=1 PrependPath=1` (script `09_Deploy_Python_AllUsers.ps1`), which installs to `C:\Program Files\Python`.
 
 ---
 
-## 4. Immediate Next Steps / Roadmap
+## 4. Complete Script Inventory (`scripts/`)
 
-1. **Physical Validation (Monday Morning)**:
-   - Boot `SILYCEE-PC1`.
-   - Verify: Clean desktop (only IDEs & browsers), Google Drive and Tinkercad load, Google Search blocked, CMD disabled, lid-close initiates shutdown.
-2. **Full Lab Verification**:
-   - Power on all 29 laptops and execute `C:\Verify_Lab.ps1` from `10.12.43.253`.
-3. **GLPI Agent Deployment**:
-   - Push `GLPI-Agent-x64.msi` silently across `OU=SILYCEE` via WinRM.
-4. **Git Sync**:
-   - Commit `PROJECT_CONTEXT_FOR_AI_V2.md`, `Setup.ps1`, and `Verify_Lab.ps1` to `https://github.com/noceir/AD_IHSANE`.
+| Script | Purpose | Where to Run |
+| :--- | :--- | :--- |
+| `01_Create_OU_and_SharedUser.ps1` | Creates `OU=SILYCEE` and student user `eleve` | Domain Controller |
+| `02_Set_DomainPasswordPolicy.ps1` | Allows blank passwords in domain | Domain Controller |
+| `03_Deploy_RemoteSoftware.ps1` | General silent MSI/EXE push via WinRM | Domain Controller |
+| `04_Export_Import_WiFi.ps1` | Netsh Wi-Fi profile exporter/importer | Client / DC |
+| `05_Enable_UWF_DeepFreeze.ps1` | Enables Unified Write Filter on C: | Client Laptop |
+| `06_Setup_Master_GPO.ps1` | **Full GPO master setup** (fast boot, whitelist, CMD block, SYSVOL cleaner) | Domain Controller |
+| `07_Verify_Lab_Health.ps1` | **Live health check & GPO sync dashboard** | Domain Controller |
+| `08_Deploy_GLPI_Agent.ps1` | Silent GLPI Agent installation push | Domain Controller |
+| `09_Deploy_Python_AllUsers.ps1` | Silent Python push with `InstallAllUsers=1` | Domain Controller |
+| `10_Unlock_Windows_Installer.ps1` | Unlocks `DisableMSI` so admins can install apps | Domain Controller |
+| `Join_Domain_Client.ps1` | Original client domain join script | Client Laptop |
+| `Join_Domain_Client_V2.ps1` | **Bulletproof client join** (fixes Python/IDE permissions, System PATH, Wi-Fi `INF`) | Client Laptop |
+
+---
+
+## 5. Next Steps for Any AI Harness Working on This Project
+
+1. **Verify Status on Monday Morning**:
+   Run `scripts/07_Verify_Lab_Health.ps1` from the DC to see which laptops are online and confirmed protected.
+2. **Deploy Python or GLPI**:
+   Use `scripts/09_Deploy_Python_AllUsers.ps1` and `scripts/08_Deploy_GLPI_Agent.ps1`.
+3. **If Provisioning a New Laptop**:
+   Use `scripts/Join_Domain_Client_V2.ps1` directly on the laptop.
